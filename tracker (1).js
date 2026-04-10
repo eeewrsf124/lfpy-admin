@@ -5,7 +5,7 @@
 
 (function(){
   // ===== Firebase 설정 (본인 프로젝트로 교체) =====
-  const FB_URL = 'YOUR_FIREBASE_URL_HERE'; // ← 본인 Firebase URL로 교체
+  const FB_URL = 'https://실제URL.firebaseio.com'; // ← 본인 Firebase URL로 교체
 
   // ===== 세션 생성 =====
   const SESSION_ID = 'S' + Date.now() + Math.random().toString(36).substr(2,6).toUpperCase();

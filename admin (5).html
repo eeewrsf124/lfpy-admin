@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LFPY Admin — 실시간 관리자</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Noto+Sans+KR:wght@300;400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#080b0f;--surface:#0f1318;--surface2:#161c24;--surface3:#1d242f;
+  --border:#1f2937;--border2:#2d3748;
+  --green:#00d48a;--green-dim:#003d28;
+  --blue:#3b82f6;--amber:#f59e0b;--red:#ef4444;--purple:#a78bfa;
+  --text:#e2e8f0;--text-muted:#64748b;--text-hint:#334155;
+  --font-mono:'JetBrains Mono',monospace;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Noto Sans KR',sans-serif;font-size:14px;line-height:1.6;overflow:hidden}
+
+/* LOGIN */
+.login-screen{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:100;flex-direction:column;gap:2rem}
+.login-logo{font-family:'Instrument Serif',serif;font-size:2.5rem;color:var(--green)}
+.login-sub{font-size:12px;color:var(--text-muted);letter-spacing:0.15em;text-transform:uppercase;margin-top:-1.5rem}
+.login-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:2rem;width:340px}
+.login-title{font-size:14px;color:var(--text-muted);margin-bottom:1.5rem;text-align:center}
+.login-input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;color:var(--text);font-family:inherit;font-size:14px;margin-bottom:10px;outline:none;transition:border-color 0.15s}
+.login-input:focus{border-color:var(--green)}
+.login-btn{width:100%;padding:12px;background:var(--green);color:#000;border:none;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;font-family:inherit;margin-top:4px}
+.login-err{font-size:12px;color:var(--red);text-align:center;margin-top:8px;height:16px}
+.fb-setup{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px;margin-top:12px;font-size:11px;color:var(--text-muted);line-height:1.7}
+.fb-setup strong{color:var(--amber)}
+
+/* LAYOUT */
+.app{display:flex;height:100vh;overflow:hidden}
+.sidebar{width:230px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0}
+.sidebar-logo{padding:20px;border-bottom:1px solid var(--border)}
+.sidebar-logo-main{font-family:'Instrument Serif',serif;font-size:20px;color:var(--green)}
+.sidebar-logo-sub{font-size:10px;color:var(--text-hint);letter-spacing:0.1em;text-transform:uppercase}
+.sidebar-nav{flex:1;padding:12px 8px;overflow-y:auto}
+.nav-section{font-size:10px;color:var(--text-hint);letter-spacing:0.12em;text-transform:uppercase;padding:8px 8px 4px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;cursor:pointer;color:var(--text-muted);transition:all 0.15s;font-size:13px;margin-bottom:2px}
+.nav-item:hover{background:var(--surface2);color:var(--text)}
+.nav-item.active{background:var(--green-dim);color:var(--green)}
+.nav-icon{font-size:14px;width:16px;text-align:center}
+.nav-badge{margin-left:auto;background:var(--red);color:white;font-size:10px;padding:1px 7px;border-radius:10px;font-family:var(--font-mono);min-width:20px;text-align:center}
+.nav-badge.green{background:var(--green);color:#000}
+.sidebar-footer{padding:12px;border-top:1px solid var(--border)}
+.admin-info{display:flex;align-items:center;gap:8px}
+.admin-avatar{width:30px;height:30px;border-radius:50%;background:var(--green-dim);border:1px solid var(--green);display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--green)}
+.admin-name{font-size:12px;font-weight:500}
+.admin-role{font-size:10px;color:var(--text-muted)}
+.logout-btn{margin-left:auto;font-size:11px;color:var(--text-hint);cursor:pointer;padding:4px}
+.logout-btn:hover{color:var(--red)}
+
+/* MAIN */
+.main{flex:1;overflow:hidden;display:flex;flex-direction:column}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:52px;border-bottom:1px solid var(--border);flex-shrink:0}
+.page-title{font-size:15px;font-weight:500}
+.topbar-right{display:flex;align-items:center;gap:12px}
+.live-dot{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--green);font-family:var(--font-mono)}
+.live-dot::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--green);animation:blink 1.2s infinite}
+.fb-status{font-size:11px;padding:3px 10px;border-radius:20px;font-family:var(--font-mono)}
+.fb-status.connected{background:var(--green-dim);color:var(--green)}
+.fb-status.disconnected{background:rgba(239,68,68,0.1);color:var(--red)}
+.content{flex:1;overflow-y:auto;padding:18px 20px}
+.content::-webkit-scrollbar{width:4px}
+.content::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+
+/* PANELS */
+.panel{display:none}
+.panel.active{display:block}
+
+/* STAT CARDS */
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px}
+.stat-label{font-size:11px;color:var(--text-muted);margin-bottom:8px}
+.stat-val{font-family:var(--font-mono);font-size:1.8rem;font-weight:500;line-height:1}
+.stat-card.green .stat-val{color:var(--green)}
+.stat-card.blue .stat-val{color:var(--blue)}
+.stat-card.amber .stat-val{color:var(--amber)}
+.stat-card.purple .stat-val{color:var(--purple)}
+.stat-sub{font-size:11px;color:var(--text-hint);margin-top:6px;font-family:var(--font-mono)}
+
+/* CARD */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:14px}
+.card-title{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.card-badge{font-size:10px;padding:2px 8px;border-radius:20px;text-transform:none;letter-spacing:0}
+.card-badge.green{background:var(--green-dim);color:var(--green)}
+.card-badge.red{background:rgba(239,68,68,0.12);color:var(--red)}
+.card-badge.blue{background:rgba(59,130,246,0.12);color:var(--blue)}
+
+/* REALTIME USER CARDS */
+.rt-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px}
+.user-card{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px;cursor:pointer;transition:border-color 0.15s;position:relative}
+.user-card:hover{border-color:var(--border2)}
+.user-card.active{border-color:var(--green)}
+.user-card.inactive{opacity:0.5}
+.user-card-top{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.user-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.user-dot.online{background:var(--green);animation:blink 2s infinite}
+.user-dot.offline{background:var(--text-hint)}
+.user-id{font-family:var(--font-mono);font-size:11px;color:var(--green);flex:1}
+.user-time{font-size:10px;color:var(--text-hint);font-family:var(--font-mono)}
+.user-page{font-size:13px;font-weight:500;color:var(--text);margin-bottom:4px}
+.user-meta{font-size:11px;color:var(--text-muted);display:flex;gap:8px;flex-wrap:wrap}
+.user-tag{background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:1px 6px;font-size:10px;font-family:var(--font-mono)}
+.user-progress{margin-top:10px}
+.user-prog-label{font-size:10px;color:var(--text-hint);margin-bottom:4px}
+.user-prog-bar{height:4px;background:var(--surface);border-radius:2px;overflow:hidden}
+.user-prog-fill{height:100%;background:var(--green);border-radius:2px;transition:width 0.4s}
+
+/* SESSION DETAIL MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:200;display:flex;align-items:center;justify-content:center;padding:20px}
+.modal{background:var(--surface);border:1px solid var(--border2);border-radius:16px;width:100%;max-width:680px;max-height:85vh;overflow:hidden;display:flex;flex-direction:column}
+.modal-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.modal-title{font-size:14px;font-weight:500}
+.modal-close{font-size:18px;cursor:pointer;color:var(--text-muted);padding:4px;line-height:1}
+.modal-close:hover{color:var(--text)}
+.modal-body{flex:1;overflow-y:auto;padding:16px 20px}
+
+/* QUIZ ANSWER DISPLAY */
+.qa-item{margin-bottom:14px;background:var(--surface2);border-radius:8px;padding:12px}
+.qa-question{font-size:12px;color:var(--text-muted);margin-bottom:8px}
+.qa-step{font-size:10px;color:var(--green);font-family:var(--font-mono);margin-bottom:4px}
+.qa-answers{display:flex;flex-wrap:wrap;gap:6px}
+.qa-ans{background:var(--green-dim);border:1px solid var(--green);color:var(--green);font-size:12px;padding:4px 10px;border-radius:6px}
+
+/* EVENT TIMELINE */
+.timeline{display:flex;flex-direction:column;gap:0}
+.tl-item{display:flex;gap:12px;padding:8px 0;border-bottom:1px solid var(--border)}
+.tl-item:last-child{border-bottom:none}
+.tl-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:5px}
+.tl-time{font-family:var(--font-mono);font-size:10px;color:var(--text-hint);min-width:60px;flex-shrink:0}
+.tl-type{font-size:10px;font-family:var(--font-mono);min-width:90px;flex-shrink:0}
+.tl-content{font-size:12px;color:var(--text-muted);flex:1}
+
+/* TABLE */
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+th{font-size:10px;color:var(--text-hint);text-transform:uppercase;letter-spacing:0.1em;padding:8px 10px;text-align:left;border-bottom:1px solid var(--border)}
+td{font-size:12px;padding:9px 10px;border-bottom:1px solid var(--border);color:var(--text-muted)}
+tr:hover td{background:var(--surface2)}
+.badge{display:inline-block;padding:2px 7px;border-radius:5px;font-size:10px;font-family:var(--font-mono)}
+.badge-green{background:var(--green-dim);color:var(--green)}
+.badge-blue{background:rgba(59,130,246,0.1);color:var(--blue)}
+.badge-amber{background:rgba(245,158,11,0.1);color:var(--amber)}
+.badge-red{background:rgba(239,68,68,0.1);color:var(--red)}
+
+/* SEARCH */
+.search-wrap{display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin-bottom:12px}
+.search-wrap input{flex:1;background:none;border:none;outline:none;color:var(--text);font-size:12px;font-family:inherit}
+.search-wrap input::placeholder{color:var(--text-hint)}
+
+/* GRID */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+
+/* BAR CHART */
+.bar-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.bar-label{font-size:11px;color:var(--text-muted);width:90px;flex-shrink:0;text-align:right}
+.bar-track{flex:1;height:8px;background:var(--surface2);border-radius:4px;overflow:hidden}
+.bar-fill{height:100%;border-radius:4px;transition:width 0.8s ease}
+.bar-val{font-size:11px;font-family:var(--font-mono);color:var(--text-muted);min-width:28px;text-align:right}
+
+/* SETUP GUIDE */
+.setup-step{display:flex;gap:14px;padding:14px 0;border-bottom:1px solid var(--border)}
+.setup-num{width:24px;height:24px;border-radius:50%;background:var(--green-dim);border:1px solid var(--green);color:var(--green);font-size:11px;font-family:var(--font-mono);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.setup-content{flex:1}
+.setup-title{font-size:13px;font-weight:500;margin-bottom:4px}
+.setup-desc{font-size:12px;color:var(--text-muted);line-height:1.7}
+.setup-code{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;font-family:var(--font-mono);font-size:11px;color:var(--green);margin-top:6px;word-break:break-all}
+.input-row{display:flex;gap:8px;margin-top:8px}
+.input-row input{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-size:12px;font-family:var(--font-mono);outline:none}
+.input-row input:focus{border-color:var(--green)}
+.btn-sm{padding:8px 16px;background:var(--green);color:#000;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-family:inherit;font-weight:500;white-space:nowrap}
+
+/* ANIMATIONS */
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.3}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideIn{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:translateX(0)}}
+.fade-up{animation:fadeUp 0.3s ease both}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="login-screen" id="login-screen">
+  <div class="login-logo">LFPY.</div>
+  <div class="login-sub">Real-time Admin Console</div>
+  <div class="login-card">
+    <div class="login-title">관리자 로그인</div>
+    <input class="login-input" id="login-id" type="text" placeholder="관리자 ID" autocomplete="off">
+    <input class="login-input" id="login-pw" type="password" placeholder="비밀번호" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="login-btn" onclick="doLogin()">로그인</button>
+    <div class="login-err" id="login-err"></div>
+    <div class="fb-setup">
+      <strong>⚠️ Firebase 미설정 시</strong><br>
+      설정 탭에서 Firebase URL을 먼저 입력하면<br>
+      실제 사용자 데이터를 볼 수 있어요.
+    </div>
+  </div>
+</div>
+
+<!-- SESSION DETAIL MODAL -->
+<div class="modal-overlay" id="modal" style="display:none" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-title">세션 상세</div>
+      <div class="modal-close" onclick="closeModal()">✕</div>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div class="app" id="app" style="display:none">
+  <div class="sidebar">
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-main">LFPY.</div>
+      <div class="sidebar-logo-sub">Admin Console</div>
+    </div>
+    <div class="sidebar-nav">
+      <div class="nav-section">실시간</div>
+      <div class="nav-item active" onclick="showPanel('realtime')">
+        <span class="nav-icon">🟢</span>실시간 현황
+        <span class="nav-badge green" id="badge-online">0</span>
+      </div>
+      <div class="nav-item" onclick="showPanel('sessions')">
+        <span class="nav-icon">👥</span>세션 목록
+        <span class="nav-badge" id="badge-sessions">0</span>
+      </div>
+      <div class="nav-section">분석</div>
+      <div class="nav-item" onclick="showPanel('quiz-stats')">
+        <span class="nav-icon">🎯</span>설문 응답 분석
+      </div>
+      <div class="nav-item" onclick="showPanel('schools-stats')">
+        <span class="nav-icon">🏫</span>학교 인기도
+      </div>
+      <div class="nav-section">시스템</div>
+      <div class="nav-item" onclick="showPanel('setup')">
+        <span class="nav-icon">🔧</span>Firebase 설정
+      </div>
+      <div class="nav-item" onclick="showPanel('settings')">
+        <span class="nav-icon">⚙️</span>설정
+      </div>
+    </div>
+    <div class="sidebar-footer">
+      <div class="admin-info">
+        <div class="admin-avatar">A</div>
+        <div>
+          <div class="admin-name" id="admin-name-display">Admin</div>
+          <div class="admin-role">Super Admin</div>
+        </div>
+        <div class="logout-btn" onclick="doLogout()">로그아웃</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="page-title" id="page-title">실시간 현황</div>
+      <div class="topbar-right">
+        <div class="live-dot">LIVE</div>
+        <div class="fb-status disconnected" id="fb-status">⚡ 연결 중...</div>
+        <div style="font-size:11px;color:var(--text-muted);font-family:var(--font-mono)" id="clock"></div>
+      </div>
+    </div>
+    <div class="content" id="main-content">
+
+      <!-- ===== REALTIME ===== -->
+      <div class="panel active" id="panel-realtime">
+        <div class="stat-grid">
+          <div class="stat-card green">
+            <div class="stat-label">🟢 현재 접속자</div>
+            <div class="stat-val" id="rt-online">0</div>
+            <div class="stat-sub" id="rt-online-sub">실시간 활성 세션</div>
+          </div>
+          <div class="stat-card blue">
+            <div class="stat-label">📊 오늘 총 방문</div>
+            <div class="stat-val" id="rt-today">0</div>
+            <div class="stat-sub">누적 방문자 수</div>
+          </div>
+          <div class="stat-card amber">
+            <div class="stat-label">✅ 설문 완료율</div>
+            <div class="stat-val" id="rt-conv">0<span style="font-size:1rem">%</span></div>
+            <div class="stat-sub">방문→추천 완료</div>
+          </div>
+          <div class="stat-card purple">
+            <div class="stat-label">⏱️ 평균 체류시간</div>
+            <div class="stat-val" id="rt-duration">0<span style="font-size:1rem">초</span></div>
+            <div class="stat-sub">오늘 평균</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">
+            현재 접속 중인 사용자
+            <span class="card-badge green" id="rt-count-badge">0명 접속중</span>
+          </div>
+          <div class="rt-grid" id="rt-users-grid">
+            <div style="color:var(--text-hint);font-size:13px;padding:20px;text-align:center;grid-column:1/-1">
+              아직 접속한 사용자가 없어요.<br>
+              <span style="font-size:11px">Firebase 설정 후 index.html에 tracker.js를 추가하면 실시간으로 보여요.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== SESSIONS ===== -->
+      <div class="panel" id="panel-sessions">
+        <div class="search-wrap">
+          <span style="color:var(--text-hint)">🔍</span>
+          <input placeholder="세션 ID, 기기, 페이지 검색..." oninput="filterSessions(this.value)" id="session-search">
+        </div>
+        <div class="card">
+          <div class="card-title">
+            전체 세션
+            <span class="card-badge blue" id="sessions-count-badge">0개</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>세션 ID</th><th>접속 시각</th>
+                  <th>기기/OS</th><th>유입 경로</th>
+                  <th>현재 위치</th><th>설문 진행</th>
+                  <th>체류시간</th><th>상태</th><th>상세</th>
+                </tr>
+              </thead>
+              <tbody id="sessions-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== QUIZ STATS ===== -->
+      <div class="panel" id="panel-quiz-stats">
+        <div class="card">
+          <div class="card-title">질문별 실제 응답 분포 <span class="card-badge blue">실제 데이터</span></div>
+          <div id="quiz-stats-content">
+            <div style="color:var(--text-hint);font-size:13px;padding:20px;text-align:center">
+              설문 응답 데이터를 불러오는 중...<br>
+              <span style="font-size:11px">사용자가 설문을 완료하면 여기에 통계가 표시돼요.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== SCHOOLS STATS ===== -->
+      <div class="panel" id="panel-schools-stats">
+        <div class="grid2">
+          <div class="card">
+            <div class="card-title">학교 조회 순위</div>
+            <div id="school-views-chart"></div>
+          </div>
+          <div class="card">
+            <div class="card-title">학교 저장 순위</div>
+            <div id="school-saves-chart"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">추천 결과 학교 분포</div>
+          <div id="school-recs-chart"></div>
+        </div>
+      </div>
+
+      <!-- ===== SETUP ===== -->
+      <div class="panel" id="panel-setup">
+        <div class="card">
+          <div class="card-title">🔧 Firebase 연동 설정 가이드</div>
+          <div class="setup-step">
+            <div class="setup-num">1</div>
+            <div class="setup-content">
+              <div class="setup-title">Firebase 프로젝트 생성</div>
+              <div class="setup-desc">
+                <a href="https://console.firebase.google.com" target="_blank" style="color:var(--green)">console.firebase.google.com</a> 접속 →
+                새 프로젝트 만들기 → 프로젝트 이름 입력 (예: lfpy-tracker)
+              </div>
+            </div>
+          </div>
+          <div class="setup-step">
+            <div class="setup-num">2</div>
+            <div class="setup-content">
+              <div class="setup-title">Realtime Database 활성화</div>
+              <div class="setup-desc">
+                왼쪽 메뉴 → Realtime Database → 데이터베이스 만들기 →
+                테스트 모드 시작 (30일 무료) → 완료
+              </div>
+            </div>
+          </div>
+          <div class="setup-step">
+            <div class="setup-num">3</div>
+            <div class="setup-content">
+              <div class="setup-title">보안 규칙 설정</div>
+              <div class="setup-desc">규칙 탭에서 아래 규칙 붙여넣기 (쓰기는 허용, 읽기는 admin만)</div>
+              <div class="setup-code">{
+  "rules": {
+    ".read": false,
+    ".write": true,
+    "sessions": { ".read": true, ".write": true },
+    "stats": { ".read": true, ".write": true }
+  }
+}</div>
+            </div>
+          </div>
+          <div class="setup-step">
+            <div class="setup-num">4</div>
+            <div class="setup-content">
+              <div class="setup-title">Firebase URL 입력</div>
+              <div class="setup-desc">데이터베이스 URL 복사 (예: YOUR_FIREBASE_URL_HERE)</div>
+              <div class="input-row">
+                <input id="fb-url-input" placeholder="https://your-project-default-rtdb.firebaseio.com" value="">
+                <button class="btn-sm" onclick="saveFbUrl()">저장</button>
+              </div>
+            </div>
+          </div>
+          <div class="setup-step">
+            <div class="setup-num">5</div>
+            <div class="setup-content">
+              <div class="setup-title">tracker.js를 index.html에 추가</div>
+              <div class="setup-desc">index.html의 &lt;/body&gt; 바로 앞에 추가 (tracker.js와 같은 폴더에 두기)</div>
+              <div class="setup-code">&lt;script src="tracker.js"&gt;&lt;/script&gt;</div>
+            </div>
+          </div>
+          <div class="setup-step" style="border:none">
+            <div class="setup-num">6</div>
+            <div class="setup-content">
+              <div class="setup-title">tracker.js의 Firebase URL 수정</div>
+              <div class="setup-desc">tracker.js 파일 상단의 FB_URL을 본인 URL로 교체</div>
+              <div class="setup-code">const FB_URL = '<span id="fb-url-display" style="color:var(--amber)">https://your-firebase-url.firebaseio.com</span>';</div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">연결 테스트</div>
+          <div style="display:flex;gap:10px;align-items:center">
+            <button class="btn-sm" onclick="testConnection()">연결 테스트</button>
+            <div id="test-result" style="font-size:12px;color:var(--text-muted)">버튼을 눌러 Firebase 연결을 확인하세요</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== SETTINGS ===== -->
+      <div class="panel" id="panel-settings">
+        <div class="grid2">
+          <div class="card">
+            <div class="card-title">관리자 계정</div>
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <div>
+                <div style="font-size:11px;color:var(--text-muted);margin-bottom:5px">관리자 ID</div>
+                <input style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-size:12px;font-family:inherit;outline:none" id="set-id">
+              </div>
+              <div>
+                <div style="font-size:11px;color:var(--text-muted);margin-bottom:5px">새 비밀번호</div>
+                <input type="password" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-size:12px;font-family:inherit;outline:none" placeholder="변경할 비밀번호" id="set-pw">
+              </div>
+              <button onclick="saveSettings()" style="padding:9px;background:var(--green);color:#000;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-family:inherit;font-weight:500">저장</button>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title">데이터 관리</div>
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <button onclick="exportAllData()" style="padding:10px;background:var(--surface2);border:1px solid var(--border);color:var(--text-muted);border-radius:6px;font-size:12px;cursor:pointer;font-family:inherit;text-align:left">📥 전체 데이터 내보내기 (JSON)</button>
+              <button onclick="clearOldSessions()" style="padding:10px;background:var(--surface2);border:1px solid rgba(245,158,11,0.3);color:var(--amber);border-radius:6px;font-size:12px;cursor:pointer;font-family:inherit;text-align:left">🗑️ 오래된 세션 정리 (24시간 이상)</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== CONFIG =====
+const ADMIN_ID_KEY='lfpy_admin_id';
+const ADMIN_PW_KEY='lfpy_admin_pw';
+const FB_URL_KEY='lfpy_fb_url';
+
+function getAdminId(){return localStorage.getItem(ADMIN_ID_KEY)||'admin';}
+function getAdminPw(){return localStorage.getItem(ADMIN_PW_KEY)||'';}
+function getFbUrl(){return localStorage.getItem(FB_URL_KEY)||'';}
+
+// ===== AUTH =====
+function doLogin(){
+  const id=document.getElementById('login-id').value.trim();
+  const pw=document.getElementById('login-pw').value;
+  if(id===getAdminId()&&pw===getAdminPw()){
+    document.getElementById('login-screen').style.display='none';
+    document.getElementById('app').style.display='flex';
+    document.getElementById('admin-name-display').textContent=id;
+    document.getElementById('set-id').value=id;
+    initAdmin();
+  } else {
+    document.getElementById('login-err').textContent='아이디 또는 비밀번호가 틀렸어요.';
+    document.getElementById('login-pw').value='';
+  }
+}
+
+function doLogout(){
+  document.getElementById('login-screen').style.display='flex';
+  document.getElementById('app').style.display='none';
+  document.getElementById('login-id').value='';
+  document.getElementById('login-pw').value='';
+  document.getElementById('login-err').textContent='';
+  stopPolling();
+}
+
+// ===== NAVIGATION =====
+const TITLES={realtime:'실시간 현황','sessions':'세션 목록','quiz-stats':'설문 응답 분석','schools-stats':'학교 인기도',setup:'Firebase 설정',settings:'설정'};
+
+function showPanel(name){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('panel-'+name).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n=>{
+    if(n.getAttribute('onclick')&&n.getAttribute('onclick').includes("'"+name+"'"))n.classList.add('active');
+  });
+  document.getElementById('page-title').textContent=TITLES[name]||name;
+  if(name==='sessions')renderSessionsTable(allSessions);
+  if(name==='quiz-stats')renderQuizStats();
+  if(name==='schools-stats')renderSchoolsStats();
+  if(name==='setup'){
+    const url=getFbUrl();
+    if(url){document.getElementById('fb-url-input').value=url;document.getElementById('fb-url-display').textContent=url;}
+  }
+}
+
+// ===== FIREBASE POLLING =====
+let allSessions={};
+let pollingInterval=null;
+let isConnected=false;
+
+function getFbUrl2(){return getFbUrl();}
+
+async function fetchSessions(){
+  const url=getFbUrl();
+  if(!url){setStatus(false,'URL 미설정');return;}
+  try{
+    const r=await fetch(url+'/sessions.json?orderBy="lastActive"&limitToLast=100');
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    const data=await r.json();
+    allSessions=data||{};
+    setStatus(true,'연결됨');
+    updateDashboard();
+  }catch(e){
+    setStatus(false,'연결 실패');
+  }
+}
+
+async function fetchStats(){
+  const url=getFbUrl();
+  if(!url)return;
+  try{
+    const today=new Date().toISOString().split('T')[0];
+    const r=await fetch(url+'/stats/daily/'+today+'.json');
+    const data=await r.json();
+    if(data){
+      document.getElementById('rt-today').textContent=(data.visitors||0).toLocaleString();
+      const conv=data.completions&&data.visitors?Math.round(data.completions/data.visitors*100):0;
+      document.getElementById('rt-conv').innerHTML=conv+'<span style="font-size:1rem">%</span>';
+    }
+  }catch(e){}
+}
+
+function setStatus(ok,msg){
+  isConnected=ok;
+  const el=document.getElementById('fb-status');
+  el.textContent=(ok?'✅ ':'❌ ')+msg;
+  el.className='fb-status '+(ok?'connected':'disconnected');
+}
+
+function startPolling(){
+  fetchSessions();
+  fetchStats();
+  if(pollingInterval)clearInterval(pollingInterval);
+  pollingInterval=setInterval(()=>{fetchSessions();fetchStats();},3000);
+}
+
+function stopPolling(){
+  if(pollingInterval)clearInterval(pollingInterval);
+}
+
+// ===== DASHBOARD UPDATE =====
+function updateDashboard(){
+  const sessions=Object.values(allSessions);
+  const now=Date.now();
+  const ACTIVE_THRESHOLD=15000; // 15초 이내 활동
+
+  const active=sessions.filter(s=>s.isActive&&(now-s.lastActive)<ACTIVE_THRESHOLD);
+  const total=sessions.length;
+
+  // 배지
+  document.getElementById('badge-online').textContent=active.length;
+  document.getElementById('badge-sessions').textContent=total;
+  document.getElementById('rt-online').textContent=active.length;
+  document.getElementById('rt-count-badge').textContent=active.length+'명 접속중';
+
+  // 평균 체류
+  const durations=sessions.filter(s=>s.duration).map(s=>s.duration);
+  const avgDur=durations.length?Math.round(durations.reduce((a,b)=>a+b,0)/durations.length):0;
+  document.getElementById('rt-duration').innerHTML=avgDur+'<span style="font-size:1rem">초</span>';
+
+  // 실시간 사용자 카드
+  renderRtUsers(sessions,active,now,ACTIVE_THRESHOLD);
+
+  // 세션 패널이 열려있으면 갱신
+  if(document.getElementById('panel-sessions').classList.contains('active')){
+    const q=document.getElementById('session-search').value;
+    filterSessions(q);
+  }
+}
+
+function renderRtUsers(sessions,active,now,threshold){
+  const grid=document.getElementById('rt-users-grid');
+  if(sessions.length===0){
+    grid.innerHTML='<div style="color:var(--text-hint);font-size:13px;padding:30px;text-align:center;grid-column:1/-1">아직 접속한 사용자가 없어요.<br><span style="font-size:11px">tracker.js 연동 후 index.html을 방문하면 여기에 표시돼요.</span></div>';
+    return;
+  }
+
+  // 활성 먼저, 그 다음 최근 순
+  const sorted=[...sessions].sort((a,b)=>{
+    const aA=(now-a.lastActive)<threshold;
+    const bA=(now-b.lastActive)<threshold;
+    if(aA&&!bA)return -1;if(!aA&&bA)return 1;
+    return b.lastActive-a.lastActive;
+  }).slice(0,20);
+
+  grid.innerHTML='';
+  sorted.forEach(s=>{
+    const isActive=(now-s.lastActive)<threshold;
+    const elapsed=Math.round((now-s.lastActive)/1000);
+    const quizCount=s.quizAnswers?Object.keys(s.quizAnswers).length:0;
+    const totalQ=9;
+    const pct=Math.round(quizCount/totalQ*100);
+
+    const card=document.createElement('div');
+    card.className='user-card '+(isActive?'active':'inactive')+' fade-up';
+    card.onclick=()=>openSessionDetail(s);
+
+    card.innerHTML=
+      '<div class="user-card-top">'+
+        '<div class="user-dot '+(isActive?'online':'offline')+'"></div>'+
+        '<div class="user-id">'+s.id+'</div>'+
+        '<div class="user-time">'+(isActive?elapsed+'초 전':(Math.round(elapsed/60))+'분 전')+'</div>'+
+      '</div>'+
+      '<div class="user-page">'+(s.currentPage||'홈')+'</div>'+
+      '<div class="user-meta">'+
+        '<span class="user-tag">'+(s.device||'알 수 없음')+'</span>'+
+        '<span class="user-tag">'+(s.os||'-')+'</span>'+
+        '<span class="user-tag">'+(s.source||'직접')+'</span>'+
+        (s.completedQuiz?'<span class="user-tag" style="background:var(--green-dim);border-color:var(--green);color:var(--green)">✓ 완료</span>':'')+
+      '</div>'+
+      (quizCount>0?
+        '<div class="user-progress">'+
+          '<div class="user-prog-label">설문 진행: '+quizCount+'/'+totalQ+'</div>'+
+          '<div class="user-prog-bar"><div class="user-prog-fill" style="width:'+pct+'%"></div></div>'+
+        '</div>':'')+
+      '<div style="font-size:10px;color:var(--text-hint);margin-top:8px;font-family:var(--font-mono)">클릭하여 상세 보기</div>';
+
+    grid.appendChild(card);
+  });
+}
+
+// ===== SESSION DETAIL MODAL =====
+function openSessionDetail(s){
+  document.getElementById('modal-title').textContent='세션 상세: '+s.id;
+  const now=Date.now();
+  const isActive=(now-s.lastActive)<15000;
+  const duration=s.duration||Math.round((now-s.startTs)/1000);
+
+  // 설문 답변
+  const qaHtml=s.quizAnswers&&Object.keys(s.quizAnswers).length>0?
+    '<div style="margin-bottom:20px">'+
+    '<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.08em">설문 응답</div>'+
+    Object.entries(s.quizAnswers).sort((a,b)=>a[1].step-b[1].step).map(([id,qa])=>
+      '<div class="qa-item">'+
+        '<div class="qa-step">Q'+qa.step+' / '+id+'</div>'+
+        '<div class="qa-question">'+qa.question+'</div>'+
+        '<div class="qa-answers">'+
+          (qa.answers||[]).map(a=>'<span class="qa-ans">'+a+'</span>').join('')+
+        '</div>'+
+      '</div>'
+    ).join('')+
+    '</div>':'<div style="font-size:12px;color:var(--text-hint);margin-bottom:20px">설문 응답 없음</div>';
+
+  // 이벤트 타임라인
+  const events=s.events?Object.values(s.events):[];
+  const typeColors={page_view:'var(--blue)',quiz_answer:'var(--green)',quiz_complete:'var(--amber)',school_view:'var(--purple)',school_save:'var(--green)',service_use:'var(--amber)',search:'var(--blue)'};
+  const typeLabels={page_view:'페이지',quiz_answer:'설문',quiz_complete:'완료',school_view:'학교조회',school_save:'학교저장',service_use:'서비스',search:'검색'};
+
+  const timelineHtml=events.length>0?
+    '<div style="margin-bottom:20px">'+
+    '<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.08em">이벤트 타임라인 ('+events.length+'개)</div>'+
+    '<div class="timeline">'+
+    events.slice(-30).reverse().map(e=>
+      '<div class="tl-item">'+
+        '<div class="tl-dot" style="background:'+(typeColors[e.type]||'var(--text-muted)')+'"></div>'+
+        '<div class="tl-time">'+(e.time||'-')+'</div>'+
+        '<div class="tl-type" style="color:'+(typeColors[e.type]||'var(--text-muted)')+'">'+
+          (typeLabels[e.type]||e.type)+'</div>'+
+        '<div class="tl-content">'+
+          (e.data?e.data.page||e.data.school||e.data.service||e.data.query||'':'')+
+          (e.data&&e.data.answers?'<br><span style="color:var(--green)">→ '+(Array.isArray(e.data.answers)?e.data.answers.join(', '):e.data.answers)+'</span>':'')+
+        '</div>'+
+      '</div>'
+    ).join('')+
+    '</div></div>':'';
+
+  // 조회/저장 학교
+  const schoolsHtml=(s.viewedSchools||s.savedSchools)?
+    '<div style="margin-bottom:20px">'+
+      (s.viewedSchools&&s.viewedSchools.length?
+        '<div style="font-size:12px;color:var(--text-muted);margin-bottom:6px">조회한 학교</div>'+
+        '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">'+
+        s.viewedSchools.map(sc=>'<span class="badge badge-blue">'+sc+'</span>').join('')+
+        '</div>':'')+
+      (s.savedSchools&&s.savedSchools.length?
+        '<div style="font-size:12px;color:var(--text-muted);margin-bottom:6px">저장한 학교</div>'+
+        '<div style="display:flex;flex-wrap:wrap;gap:6px">'+
+        s.savedSchools.map(sc=>'<span class="badge badge-green">'+sc+'</span>').join('')+
+        '</div>':'')+
+    '</div>':'';
+
+  document.getElementById('modal-body').innerHTML=
+    // 기본 정보
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:20px">'+
+    [
+      {k:'상태',v:isActive?'🟢 활성':'⚫ 비활성'},
+      {k:'기기',v:(s.device||'-')+' / '+(s.os||'-')},
+      {k:'브라우저',v:s.browser||'-'},
+      {k:'유입 경로',v:s.source||'-'},
+      {k:'접속 시각',v:new Date(s.startTs||s.startTime).toLocaleTimeString('ko')},
+      {k:'체류시간',v:Math.floor(duration/60)+'분 '+duration%60+'초'},
+      {k:'화면 크기',v:(s.screenW||'-')+'×'+(s.screenH||'-')},
+      {k:'설문 완료',v:s.completedQuiz?'✅ 완료':'❌ 미완료'},
+    ].map(r=>
+      '<div style="background:var(--surface2);border-radius:6px;padding:10px">'+
+        '<div style="font-size:10px;color:var(--text-hint);margin-bottom:4px">'+r.k+'</div>'+
+        '<div style="font-size:13px;color:var(--text)">'+r.v+'</div>'+
+      '</div>'
+    ).join('')+
+    '</div>'+
+    qaHtml+schoolsHtml+timelineHtml;
+
+  document.getElementById('modal').style.display='flex';
+}
+
+function closeModal(){document.getElementById('modal').style.display='none';}
+
+// ===== SESSION TABLE =====
+function renderSessionsTable(sessions){
+  const tbody=document.getElementById('sessions-tbody');
+  const now=Date.now();
+  const arr=Object.values(sessions).sort((a,b)=>b.lastActive-a.lastActive);
+  document.getElementById('sessions-count-badge').textContent=arr.length+'개';
+  tbody.innerHTML='';
+  arr.forEach(s=>{
+    const isActive=(now-s.lastActive)<15000;
+    const quizCount=s.quizAnswers?Object.keys(s.quizAnswers).length:0;
+    const duration=s.duration||Math.round((now-s.startTs)/1000);
+    const tr=document.createElement('tr');
+    tr.innerHTML=
+      '<td style="font-family:var(--font-mono);color:var(--green);font-size:11px">'+s.id+'</td>'+
+      '<td>'+new Date(s.startTs||s.startTime||Date.now()).toLocaleTimeString('ko')+'</td>'+
+      '<td>'+(s.device||'-')+' '+(s.os?'('+s.os+')':'')+'</td>'+
+      '<td>'+(s.source||'-')+'</td>'+
+      '<td>'+(s.currentPage||'홈')+'</td>'+
+      '<td><span style="font-family:var(--font-mono)">'+quizCount+'/9</span>'+(s.completedQuiz?' <span class="badge badge-green">완료</span>':'')+'</td>'+
+      '<td style="font-family:var(--font-mono)">'+Math.floor(duration/60)+'분 '+duration%60+'초</td>'+
+      '<td><span class="badge '+(isActive?'badge-green':'badge-red')+'">'+(isActive?'활성':'종료')+'</span></td>'+
+      '<td><button onclick="openSessionDetail(getSession(\''+s.id+'\'))" style="background:var(--surface2);border:1px solid var(--border);color:var(--text-muted);padding:3px 8px;border-radius:4px;font-size:11px;cursor:pointer;font-family:inherit">상세</button></td>';
+    tbody.appendChild(tr);
+  });
+}
+
+function getSession(id){return allSessions[id]||{};}
+
+function filterSessions(q){
+  if(!q){renderSessionsTable(allSessions);return;}
+  const filtered={};
+  Object.entries(allSessions).forEach(([k,s])=>{
+    const str=JSON.stringify(s).toLowerCase();
+    if(str.includes(q.toLowerCase()))filtered[k]=s;
+  });
+  renderSessionsTable(filtered);
+}
+
+// ===== QUIZ STATS =====
+function renderQuizStats(){
+  const sessions=Object.values(allSessions);
+  if(sessions.length===0){
+    document.getElementById('quiz-stats-content').innerHTML=
+      '<div style="color:var(--text-hint);font-size:13px;padding:20px;text-align:center">아직 데이터가 없어요.</div>';
+    return;
+  }
+
+  // 질문별 집계
+  const qMap={};
+  sessions.forEach(s=>{
+    if(!s.quizAnswers)return;
+    Object.entries(s.quizAnswers).forEach(([id,qa])=>{
+      if(!qMap[id])qMap[id]={question:qa.question,step:qa.step,answers:{}};
+      (qa.answers||[]).forEach(ans=>{
+        qMap[id].answers[ans]=(qMap[id].answers[ans]||0)+1;
+      });
+    });
+  });
+
+  const sorted=Object.entries(qMap).sort((a,b)=>a[1].step-b[1].step);
+  if(sorted.length===0){
+    document.getElementById('quiz-stats-content').innerHTML=
+      '<div style="color:var(--text-hint);font-size:13px;padding:20px;text-align:center">설문 응답 데이터가 없어요.</div>';
+    return;
+  }
+
+  const colors=['var(--green)','var(--blue)','var(--amber)','var(--purple)','#ec4899','var(--red)'];
+  let html='';
+  sorted.forEach(([id,data])=>{
+    const total=Object.values(data.answers).reduce((a,b)=>a+b,0);
+    const maxVal=Math.max(...Object.values(data.answers));
+    html+='<div style="margin-bottom:20px;padding:14px;background:var(--surface2);border-radius:8px">'+
+      '<div style="font-size:11px;color:var(--green);font-family:var(--font-mono);margin-bottom:4px">Q'+data.step+' · '+id+'</div>'+
+      '<div style="font-size:13px;font-weight:500;margin-bottom:12px">'+data.question+'</div>'+
+      Object.entries(data.answers).sort((a,b)=>b[1]-a[1]).map(([ans,cnt],i)=>{
+        const pct=maxVal>0?Math.round(cnt/maxVal*100):0;
+        const realPct=total>0?Math.round(cnt/total*100):0;
+        return '<div class="bar-row">'+
+          '<div class="bar-label">'+ans+'</div>'+
+          '<div class="bar-track"><div class="bar-fill" style="width:'+pct+'%;background:'+colors[i%colors.length]+'"></div></div>'+
+          '<div class="bar-val">'+cnt+'명 ('+realPct+'%)</div>'+
+        '</div>';
+      }).join('')+
+      '<div style="font-size:10px;color:var(--text-hint);margin-top:8px;font-family:var(--font-mono)">총 '+total+'명 응답</div>'+
+    '</div>';
+  });
+  document.getElementById('quiz-stats-content').innerHTML=html;
+}
+
+// ===== SCHOOLS STATS =====
+function renderSchoolsStats(){
+  const sessions=Object.values(allSessions);
+  const viewMap={},saveMap={},recMap={};
+
+  sessions.forEach(s=>{
+    (s.viewedSchools||[]).forEach(sc=>{viewMap[sc]=(viewMap[sc]||0)+1;});
+    (s.savedSchools||[]).forEach(sc=>{saveMap[sc]=(saveMap[sc]||0)+1;});
+    (s.recommendedSchools||[]).forEach(sc=>{recMap[sc]=(recMap[sc]||0)+1;});
+  });
+
+  renderRankChart('school-views-chart',viewMap,'var(--blue)',10);
+  renderRankChart('school-saves-chart',saveMap,'var(--green)',10);
+  renderRankChart('school-recs-chart',recMap,'var(--purple)',15);
+}
+
+function renderRankChart(id,data,color,limit){
+  const el=document.getElementById(id);
+  const sorted=Object.entries(data).sort((a,b)=>b[1]-a[1]).slice(0,limit);
+  if(sorted.length===0){el.innerHTML='<div style="color:var(--text-hint);font-size:12px;padding:10px">데이터 없음</div>';return;}
+  const max=sorted[0][1];
+  el.innerHTML=sorted.map(([name,cnt])=>{
+    const pct=Math.round(cnt/max*100);
+    return '<div class="bar-row">'+
+      '<div class="bar-label" style="width:120px;font-size:10px">'+name.replace('고등학교','고')+'</div>'+
+      '<div class="bar-track"><div class="bar-fill" style="width:'+pct+'%;background:'+color+'"></div></div>'+
+      '<div class="bar-val">'+cnt+'</div>'+
+    '</div>';
+  }).join('');
+}
+
+// ===== FIREBASE SETUP =====
+function saveFbUrl(){
+  const url=document.getElementById('fb-url-input').value.trim();
+  if(!url){showToast('URL을 입력해주세요','red');return;}
+  localStorage.setItem(FB_URL_KEY,url);
+  document.getElementById('fb-url-display').textContent=url;
+  showToast('Firebase URL이 저장됐어요!');
+  startPolling();
+}
+
+async function testConnection(){
+  const url=getFbUrl();
+  if(!url){document.getElementById('test-result').textContent='⚠️ Firebase URL을 먼저 입력하세요';return;}
+  document.getElementById('test-result').textContent='🔄 연결 중...';
+  try{
+    const r=await fetch(url+'/.json?shallow=true');
+    if(r.ok){
+      document.getElementById('test-result').innerHTML='<span style="color:var(--green)">✅ 연결 성공!</span>';
+      setStatus(true,'연결됨');
+    } else throw new Error();
+  }catch(e){
+    document.getElementById('test-result').innerHTML='<span style="color:var(--red)">❌ 연결 실패 — URL 또는 보안 규칙 확인</span>';
+    setStatus(false,'연결 실패');
+  }
+}
+
+// ===== SETTINGS =====
+function saveSettings(){
+  const id=document.getElementById('set-id').value.trim();
+  const pw=document.getElementById('set-pw').value;
+  if(id)localStorage.setItem(ADMIN_ID_KEY,id);
+  if(pw)localStorage.setItem(ADMIN_PW_KEY,pw);
+  showToast('설정이 저장됐어요!');
+}
+
+function exportAllData(){
+  const data={sessions:allSessions,exported:new Date().toISOString(),total:Object.keys(allSessions).length};
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='lfpy-sessions-'+new Date().toISOString().split('T')[0]+'.json';
+  a.click();
+  showToast('데이터를 내보냈어요!');
+}
+
+async function clearOldSessions(){
+  if(!confirm('24시간 이상 된 세션을 삭제할까요?'))return;
+  const url=getFbUrl();
+  if(!url){showToast('Firebase URL 없음','red');return;}
+  const cutoff=Date.now()-86400000;
+  let count=0;
+  for(const [k,s] of Object.entries(allSessions)){
+    if(s.lastActive<cutoff){
+      await fetch(url+'/sessions/'+k+'.json',{method:'DELETE'});
+      count++;
+    }
+  }
+  showToast(count+'개 세션 삭제 완료');
+  fetchSessions();
+}
+
+// ===== UTILS =====
+function showToast(msg,type='green'){
+  const t=document.createElement('div');
+  t.style.cssText='position:fixed;bottom:20px;right:20px;background:'+(type==='red'?'var(--red)':'var(--green)')+';color:#000;padding:10px 18px;border-radius:8px;font-size:12px;z-index:999;animation:fadeUp 0.3s ease;font-weight:500';
+  t.textContent=msg;
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(),2500);
+}
+
+function startClock(){
+  const el=document.getElementById('clock');
+  setInterval(()=>{el.textContent=new Date().toLocaleTimeString('ko');},1000);
+}
+
+// ===== INIT =====
+function initAdmin(){
+  startClock();
+  const url=getFbUrl();
+  if(url){
+    document.getElementById('fb-url-input').value=url;
+    startPolling();
+  } else {
+    setStatus(false,'URL 미설정');
+    showToast('⚙️ Firebase 설정 탭에서 URL을 입력하세요','red');
+    setTimeout(()=>showPanel('setup'),1500);
+  }
+}
+
+// 엔터키
+document.getElementById('login-id').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('login-pw').focus();});
+</script>
+</body>
+</html>
